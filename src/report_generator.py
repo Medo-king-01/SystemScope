@@ -1,11 +1,7 @@
-"""
-SystemScope Report Generator.
-Generates comprehensive HTML reports.
-"""
 import os
 import json
 from datetime import datetime
 from pathlib import Path
 
 def generate_html_report(data):
-    return "<html><body>Report</body></html>"
+    return '<html><body>Report</body></html>'
