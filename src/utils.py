@@ -1,12 +1,7 @@
-"""
-Utility to run subprocess without showing console windows.
-"""
-
 import subprocess
 import sys
 
 CREATE_NO_WINDOW = 0x08000000
-
 
 def run_silent(cmd, **kwargs):
     kwargs.setdefault('creationflags', CREATE_NO_WINDOW)
