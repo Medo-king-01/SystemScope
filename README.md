@@ -56,11 +56,10 @@ Or just double-click `SystemScope.exe`.
 
 | Tab | Features |
 |-----|----------|
-| ⚡ **System** | CPU/RAM/GPU monitoring, temperatures, processes, startup programs |
-| 🌐 **Network** | Latency (TCP), packet loss, interfaces, connections, DNS/gateway |
-| 💾 **Storage** | Partitions, largest directories, file types, large files |
-| 🔍 **Diagnostics** | Rule-based engine + Windows Event Logs with filters |
-| 📈 **Trends** | QtCharts time-series from SQLite (1h/6h/24h/7d periods) |
+|| ⚡ **System** | CPU/RAM/GPU monitoring, temperatures, processes, startup programs |
+|| 🌐 **Network** | Latency (TCP), packet loss, interfaces, connections, DNS/gateway |
+|| 💾 **Storage** | Partitions, largest directories, file types, large files |
+|| 🔍 **Diagnostics** | Rule-based engine + Windows Event Logs with filters |
 
 ## 💾 Export Formats
 

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QTimer, Qt, Signal, Slot, QThread, QSize
 from PySide6.QtGui import QColor, QPainter, QIcon, QFontDatabase, QFont
 from pathlib import Path
-from PySide6.QtCharts import QChart, QChartView, QLineSeries, QDateTimeAxis, QValueAxis, QSplineSeries
+from PySide6.QtCharts import QChart, QChartView, QLineSeries, QDateTimeAxis, QValueAxis
 
 
 def resource_path(relative_path):
@@ -600,7 +600,6 @@ class DiagnosticsTab(QWidget):
         
         # Filter section
         filter_group = QGroupBox("Windows Event Log Filters")
-        filter_group.setStyleSheet(f"QGroupBox {{ margin-top: 10px; }}" if False else "")
         filter_main_layout = QVBoxLayout(filter_group)
         
         # Row 1
@@ -787,179 +786,6 @@ class DiagnosticsTab(QWidget):
             self.diagnostics_table.setItem(i, 4, QTableWidgetItem(d.get('recommendation', '')))
 
 
-class TrendsTab(QWidget):
-    """Trends tab: Auto-loads data from SQLite."""
-    
-    def __init__(self):
-        super().__init__()
-        self.layout = QVBoxLayout(self)
-        self.layout.setSpacing(15)
-
-        # Controls
-        controls_layout = QHBoxLayout()
-        controls_layout.addWidget(QLabel("Period:"))
-        self.period_combo = QComboBox()
-        self.period_combo.addItems(["آخر ساعة", "آخر 6 ساعات", "آخر 24 ساعة", "آخر 7 أيام"])
-        self.period_combo.setCurrentIndex(2)
-        controls_layout.addWidget(self.period_combo)
-        
-        controls_layout.addWidget(QLabel("Metric:"))
-        self.metric_combo = QComboBox()
-        self.metric_combo.addItems(["المعالج + الذاكرة", "المعالج فقط", "الذاكرة فقط"])
-        controls_layout.addWidget(self.metric_combo)
-        
-        controls_layout.addStretch()
-        self.refresh_btn = QPushButton("🔄 تحميل البيانات")
-        self.refresh_btn.clicked.connect(self._load_data)
-        controls_layout.addWidget(self.refresh_btn)
-        
-        self.layout.addLayout(controls_layout)
-
-        # Chart
-        self.chart = QChart()
-        self.chart.setTitle("System Usage Trends")
-        self.chart.setAnimationOptions(QChart.SeriesAnimations)
-        self.chart.setTheme(QChart.ChartThemeDark)
-        self.chart.setBackgroundBrush(QColor(COLORS["card"]))
-        self.chart.legend().setVisible(True)
-        self.chart.legend().setAlignment(Qt.AlignBottom)
-
-        # CPU series
-        self.cpu_series = QSplineSeries()
-        self.cpu_series.setName("CPU %")
-        self.cpu_series.setColor(QColor(COLORS["accent"]))
-        pen = self.cpu_series.pen()
-        pen.setWidth(2)
-        self.cpu_series.setPen(pen)
-        self.chart.addSeries(self.cpu_series)
-
-        # RAM series
-        self.ram_series = QSplineSeries()
-        self.ram_series.setName("RAM %")
-        self.ram_series.setColor(QColor(COLORS["accent_secondary"]))
-        pen = self.ram_series.pen()
-        pen.setWidth(2)
-        self.ram_series.setPen(pen)
-        self.chart.addSeries(self.ram_series)
-
-        # Axes
-        self.axis_x = QDateTimeAxis()
-        self.axis_x.setFormat("HH:mm")
-        self.axis_x.setTitleText("Time")
-        self.axis_x.setTickCount(8)
-        self.chart.addAxis(self.axis_x, Qt.AlignBottom)
-        self.cpu_series.attachAxis(self.axis_x)
-        self.ram_series.attachAxis(self.axis_x)
-
-        self.axis_y = QValueAxis()
-        self.axis_y.setTitleText("Usage %")
-        self.axis_y.setRange(0, 100)
-        self.axis_y.setTickCount(11)
-        self.axis_y.setLabelFormat("%d%%")
-        self.chart.addAxis(self.axis_y, Qt.AlignLeft)
-        self.cpu_series.attachAxis(self.axis_y)
-        self.ram_series.attachAxis(self.axis_y)
-
-        chart_view = QChartView(self.chart)
-        chart_view.setRenderHint(QPainter.Antialiasing)
-        chart_view.setMinimumHeight(300)
-        self.layout.addWidget(chart_view, stretch=1)
-
-        # Summary
-        self.summary_label = QLabel("جاري تحميل البيانات...")
-        self.summary_label.setStyleSheet(f"color: {COLORS['text_muted']}; padding: 10px; font-size: 11pt;")
-        self.summary_label.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(self.summary_label)
-
-        # Auto-load
-        QTimer.singleShot(500, self._load_data)
-    
-    def _load_data(self):
-        from PySide6.QtCore import QDateTime, Qt as QtCore
-
-        period_text = self.period_combo.currentText()
-        if "1 Hour" in period_text:
-            hours = 1
-        elif "6 Hours" in period_text:
-            hours = 6
-        elif "24 Hours" in period_text:
-            hours = 24
-        elif "7 Days" in period_text:
-            hours = 24 * 7
-        else:
-            hours = 24
-
-        metric = self.metric_combo.currentText()
-
-        try:
-            db = Database()
-            snapshots = db.get_recent_snapshots(limit=1000)
-            db.close()
-        except Exception as e:
-            self.summary_label.setText(f"خطأ في قاعدة البيانات: {e}")
-            return
-
-        if not snapshots:
-            self.summary_label.setText("📊 لا توجد بيانات — استخدم التطبيق فترة لجمع البيانات")
-            return
-
-        cutoff = datetime.now() - timedelta(hours=hours)
-        filtered = [s for s in snapshots if datetime.fromisoformat(s.get('timestamp', '2000-01-01')) > cutoff]
-
-        if not filtered:
-            self.summary_label.setText(f"📊 لا توجد بيانات في آخر {hours} ساعة")
-            return
-
-        self.cpu_series.clear()
-        self.ram_series.clear()
-
-        cpu_values = []
-        ram_values = []
-
-        for snap in filtered:
-            ts_str = snap.get('timestamp', '')
-            try:
-                dt = QDateTime.fromString(ts_str, QtCore.ISODate)
-                if not dt.isValid():
-                    dt = QDateTime.fromString(ts_str, QtCore.ISODateWithMs)
-                if not dt.isValid():
-                    dt = datetime.fromisoformat(ts_str)
-                    dt = QDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
-                ts = dt.toMSecsSinceEpoch()
-            except Exception:
-                continue
-
-            if metric in ("CPU + RAM", "CPU Only"):
-                cpu = snap.get('cpu_usage')
-                if cpu is not None:
-                    self.cpu_series.append(ts, cpu)
-                    cpu_values.append(cpu)
-
-            if metric in ("CPU + RAM", "RAM Only"):
-                ram = snap.get('ram_usage')
-                if ram is not None:
-                    self.ram_series.append(ts, ram)
-                    ram_values.append(ram)
-
-        self.cpu_series.setVisible(metric in ("CPU + RAM", "CPU Only"))
-        self.ram_series.setVisible(metric in ("CPU + RAM", "RAM Only"))
-
-        if hours > 24:
-            self.axis_x.setFormat("dd/MM HH:mm")
-        else:
-            self.axis_x.setFormat("HH:mm")
-
-        parts = [f"📊 {len(filtered)} عينة"]
-        if cpu_values:
-            avg_cpu = sum(cpu_values) / len(cpu_values)
-            parts.append(f"المعالج: متوسط {avg_cpu:.1f}% | أعلى {max(cpu_values):.1f}%")
-        if ram_values:
-            avg_ram = sum(ram_values) / len(ram_values)
-            parts.append(f"الذاكرة: متوسط {avg_ram:.1f}% | أعلى {max(ram_values):.1f}%")
-
-        self.summary_label.setText("  •  ".join(parts))
-
-
 class MainWindow(QMainWindow):
     """Main window with direct method calls (no signal chain issues)."""
 
@@ -1044,13 +870,11 @@ class MainWindow(QMainWindow):
         self.network_tab = NetworkTab()
         self.storage_tab = StorageTab(self)  # Pass parent
         self.diagnostics_tab = DiagnosticsTab()
-        self.trends_tab = TrendsTab()
-        
+
         self.tabs.addTab(self.system_tab, "⚡ System")
         self.tabs.addTab(self.network_tab, "🌐 Network")
         self.tabs.addTab(self.storage_tab, "💾 Storage")
         self.tabs.addTab(self.diagnostics_tab, "🔍 Diagnostics")
-        self.tabs.addTab(self.trends_tab, "📈 Trends")
         
         # Status bar
         self.status_bar = QStatusBar()
