@@ -5,7 +5,6 @@ Main Window for SystemScope - Clean version.
 import sys
 import time
 import os
-import math
 from datetime import datetime, timedelta
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
@@ -14,10 +13,35 @@ from PySide6.QtWidgets import (
     QMessageBox, QComboBox, QSpinBox, QLineEdit, QDialog
 )
 from PySide6.QtCore import QTimer, Qt, Signal, Slot, QThread, QSize
-from PySide6.QtGui import QColor, QPainter, QIcon
+from PySide6.QtGui import QColor, QPainter, QIcon, QFontDatabase, QFont
 from pathlib import Path
-import sys
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QDateTimeAxis, QValueAxis, QSplineSeries
+
+
+def resource_path(relative_path):
+    """Get absolute path for bundled resources (works with PyInstaller)."""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(__file__), relative_path)
+
+
+def load_fonts():
+    """Register Cairo fonts with Qt."""
+    font_db = QFontDatabase()
+    base = resource_path("assets/fonts")
+    font_files = [
+        "Cairo-Regular.ttf", "Cairo-Bold.ttf", "Cairo-SemiBold.ttf",
+        "Cairo-Medium.ttf", "Cairo-Light.ttf", "Cairo-ExtraBold.ttf",
+    ]
+    loaded = []
+    for f in font_files:
+        path = os.path.join(base, f)
+        if os.path.exists(path):
+            font_id = font_db.addApplicationFont(path)
+            if font_id != -1:
+                loaded.append(f)
+    return loaded
+
 
 from ..collectors.system_info import collect_all as collect_system
 from ..collectors.network_info import collect_all as collect_network
@@ -28,86 +52,132 @@ from ..database.db import Database
 
 
 COLORS = {
-    "background": "#0d1117",
-    "card": "#161b22",
-    "border": "#30363d",
-    "text": "#c9d1d9",
-    "text_muted": "#8b949e",
-    "accent": "#ff3860",
-    "accent_secondary": "#00d1b2",
-    "warning": "#ffaa00",
-    "good": "#238636",
-    "critical": "#da3633",
-    "info": "#58a6ff",
+    "background": "#0a0a0a",
+    "card": "#111111",
+    "card_hover": "#1a1a1a",
+    "border": "#2a2a2a",
+    "border_light": "#3a3a3a",
+    "text": "#f0f0f0",
+    "text_muted": "#777777",
+    "accent": "#E63946",
+    "accent_glow": "#ff4d5a",
+    "accent_secondary": "#2EC4B6",
+    "accent_tertiary": "#D4E84C",
+    "accent_quaternary": "#2D6A4F",
+    "warning": "#F4A261",
+    "good": "#2D6A4F",
+    "critical": "#E63946",
+    "info": "#2EC4B6",
 }
 
 
 def get_stylesheet():
+    """Premium dark theme stylesheet with Cairo font and refined aesthetics."""
     return f"""
     QMainWindow {{ background-color: {COLORS['background']}; }}
     QWidget {{ background-color: {COLORS['background']}; color: {COLORS['text']};
-               font-family: 'Segoe UI', sans-serif; font-size: 10pt; }}
-    QTabWidget::pane {{ border: 1px solid {COLORS['border']}; background-color: {COLORS['card']}; }}
-    QTabBar::tab {{ background-color: {COLORS['card']}; color: {COLORS['text_muted']};
-                   padding: 10px 20px; margin-right: 2px; border-top-left-radius: 6px;
-                   border-top-right-radius: 6px; border: 1px solid {COLORS['border']}; border-bottom: none; }}
-    QTabBar::tab:selected {{ background-color: {COLORS['background']}; color: {COLORS['text']};
-                            border-bottom: 2px solid {COLORS['accent']}; }}
+               font-family: 'Cairo', 'Segoe UI', sans-serif; font-size: 10pt; }}
+    * {{ font-family: 'Cairo', 'Segoe UI', sans-serif; }}
+    QTabWidget::pane {{ border: 1px solid {COLORS['border']};
+                        background-color: {COLORS['card']}; border-radius: 10px; }}
+    QTabBar::tab {{ background-color: transparent; color: {COLORS['text_muted']};
+                    padding: 12px 28px; margin: 2px; border: none;
+                    font-size: 11pt; font-weight: 500;
+                    border-bottom: 3px solid transparent; }}
+    QTabBar::tab:hover {{ color: {COLORS['text']}; background-color: {COLORS['card_hover']}; border-radius: 6px 6px 0 0; }}
+    QTabBar::tab:selected {{ color: {COLORS['accent']}; border-bottom: 3px solid {COLORS['accent']}; background-color: {COLORS['card']}; }}
     QGroupBox {{ background-color: {COLORS['card']}; border: 1px solid {COLORS['border']};
-                border-radius: 8px; margin-top: 15px; padding: 15px; font-weight: bold; }}
-    QGroupBox::title {{ color: {COLORS['text']}; subcontrol-origin: margin; left: 15px;
-                       padding: 0 8px; font-weight: bold; font-size: 11pt; }}
+                border-radius: 10px; margin-top: 18px; padding: 18px; font-weight: bold; }}
+    QGroupBox::title {{ color: {COLORS['accent']}; subcontrol-origin: margin; left: 15px;
+                        padding: 0 10px; font-weight: bold; font-size: 11pt; }}
+    QGroupBox:hover {{ border-color: {COLORS['border_light']}; }}
     QPushButton {{ background-color: {COLORS['accent']}; color: white; border: none;
-                  border-radius: 6px; padding: 8px 20px; font-weight: bold; min-height: 28px; }}
-    QPushButton:hover {{ background-color: #e62e54; }}
-    QPushButton:pressed {{ background-color: #cc294a; }}
-    QPushButton:disabled {{ background-color: #4a4a4a; color: #888; }}
+                   border-radius: 8px; padding: 10px 24px; font-weight: bold;
+                   min-height: 32px; font-size: 10pt; }}
+    QPushButton:hover {{ background-color: {COLORS['accent_glow']}; box-shadow: 0 0 12px {COLORS['accent']}80; }}
+    QPushButton:pressed {{ background-color: #c12836; }}
+    QPushButton:disabled {{ background-color: #333; color: #666; }}
+    QPushButton#secondaryBtn {{ background-color: {COLORS['accent_secondary']}; }}
+    QPushButton#secondaryBtn:hover {{ background-color: #3dd4c4; box-shadow: 0 0 12px {COLORS['accent_secondary']}80; }}
     QTableWidget {{ background-color: {COLORS['card']}; border: 1px solid {COLORS['border']};
-                   border-radius: 6px; gridline-color: {COLORS['border']}; selection-background-color: #264f78; }}
-    QTableWidget::item {{ padding: 6px; border-bottom: 1px solid {COLORS['border']}; }}
-    QTableWidget::item:selected {{ background-color: #264f78; }}
-    QHeaderView::section {{ background-color: #1f242c; color: {COLORS['text']}; padding: 8px;
-                           border: none; border-bottom: 2px solid {COLORS['accent']}; font-weight: bold; }}
-    QScrollBar:vertical {{ background-color: {COLORS['card']}; width: 10px; border-radius: 5px; }}
-    QScrollBar::handle:vertical {{ background-color: {COLORS['border']}; border-radius: 5px; min-height: 20px; }}
-    QProgressBar {{ border: 1px solid {COLORS['border']}; border-radius: 4px; text-align: center;
+                    border-radius: 8px; gridline-color: {COLORS['border']};
+                    selection-background-color: #2a4f78; alternate-background-color: #0f0f0f; }}
+    QTableWidget::item {{ padding: 8px; border-bottom: 1px solid {COLORS['border']}; }}
+    QTableWidget::item:selected {{ background-color: #2a4f78; }}
+    QHeaderView::section {{ background-color: #1a1a1a; color: {COLORS['text']}; padding: 10px;
+                            border: none; border-bottom: 2px solid {COLORS['accent']}; font-weight: bold; }}
+    QScrollBar:vertical {{ background-color: {COLORS['card']}; width: 8px; border-radius: 4px; }}
+    QScrollBar::handle:vertical {{ background-color: {COLORS['border_light']}; border-radius: 4px; min-height: 30px; }}
+    QScrollBar::handle:vertical:hover {{ background-color: {COLORS['accent']}; }}
+    QProgressBar {{ border: 1px solid {COLORS['border']}; border-radius: 6px; text-align: center;
                    background-color: {COLORS['card']}; color: {COLORS['text']}; font-weight: bold; }}
-    QProgressBar::chunk {{ border-radius: 3px; background-color: {COLORS['accent_secondary']}; }}
-    QStatusBar {{ background-color: {COLORS['card']}; color: {COLORS['text_muted']};
-                 border-top: 1px solid {COLORS['border']}; }}
+    QProgressBar::chunk {{ border-radius: 5px; }}
     QComboBox {{ background-color: {COLORS['card']}; border: 1px solid {COLORS['border']};
-                border-radius: 6px; padding: 6px 15px; min-width: 120px; color: {COLORS['text']}; }}
+                border-radius: 8px; padding: 8px 18px; min-width: 130px; color: {COLORS['text']}; }}
     QComboBox::drop-down {{ border: none; width: 30px; }}
     QComboBox QAbstractItemView {{ background-color: {COLORS['card']}; color: {COLORS['text']};
                                    selection-background-color: {COLORS['accent']}; border: 1px solid {COLORS['border']}; }}
     QSpinBox {{ background-color: {COLORS['card']}; border: 1px solid {COLORS['border']};
-               border-radius: 6px; padding: 4px 8px; color: {COLORS['text']}; }}
+                border-radius: 8px; padding: 6px 10px; color: {COLORS['text']}; }}
     QLineEdit {{ background-color: {COLORS['card']}; border: 1px solid {COLORS['border']};
-                border-radius: 6px; padding: 6px 12px; color: {COLORS['text']}; }}
+                 border-radius: 8px; padding: 8px 14px; color: {COLORS['text']}; }}
+    QLineEdit:focus {{ border-color: {COLORS['accent']}; }}
+    QStatusBar {{ background-color: {COLORS['card']}; color: {COLORS['text_muted']}; border-top: 1px solid {COLORS['border']}; }}
+    QToolBar {{ background-color: {COLORS['card']}; border-bottom: 1px solid {COLORS['border']}; padding: 6px 12px; spacing: 6px; }}
+    QToolBar::separator {{ width: 1px; background-color: {COLORS['border']}; }}
+    QLabel {{ color: {COLORS['text']}; }}
+    QDialog {{ background-color: {COLORS['card']}; }}
+    QCheckBox {{ color: {COLORS['text']}; spacing: 8px; }}
+    QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 3px; border: 2px solid {COLORS['border']}; background-color: {COLORS['card']}; }}
+    QCheckBox::indicator:checked {{ background-color: {COLORS['accent']}; border-color: {COLORS['accent']}; }}
     """
 
 
 class MetricCard(QFrame):
-    def __init__(self, title="", value="", subtitle="", progress=None, parent=None):
+    """Premium metric card with hover glow and accent border."""
+
+    def __init__(self, title="", value="", subtitle="", progress=None, accent_color=None, parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.NoFrame)
-        self.setStyleSheet(f"MetricCard {{ background-color: {COLORS['card']}; border: 1px solid {COLORS['border']}; border-radius: 10px; padding: 15px; }}")
+        self.accent_color = accent_color or COLORS['accent']
+        self.setStyleSheet(f"""
+            MetricCard {{
+                background-color: {COLORS['card']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 12px;
+                padding: 16px;
+                border-top: 3px solid {self.accent_color};
+            }}
+            MetricCard:hover {{
+                background-color: {COLORS['card_hover']};
+                border-color: {COLORS['border_light']};
+                border-top: 3px solid {self.accent_color};
+                box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            }}
+            MetricCardLabel {{ color: {COLORS['text_muted']}; font-size: 9pt; font-weight: 500; }}
+            MetricCardValue {{ color: {COLORS['text']}; font-size: 24pt; font-weight: bold; }}
+            MetricCardSub {{ color: {COLORS['text_muted']}; font-size: 8pt; }}
+        """)
         layout = QVBoxLayout(self)
-        layout.setSpacing(5)
+        layout.setSpacing(6)
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 9pt;")
+        title_label.setObjectName("MetricCardLabel")
         layout.addWidget(title_label)
         self.value_label = QLabel(value)
-        self.value_label.setStyleSheet(f"color: {COLORS['text']}; font-size: 22pt; font-weight: bold;")
+        self.value_label.setObjectName("MetricCardValue")
         layout.addWidget(self.value_label)
         if subtitle:
             sub_label = QLabel(subtitle)
-            sub_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 8pt;")
+            sub_label.setObjectName("MetricCardSub")
             layout.addWidget(sub_label)
         if progress is not None:
             self.progress_bar = QProgressBar()
             self.progress_bar.setMaximumHeight(6)
             self.progress_bar.setTextVisible(False)
+            self.progress_bar.setStyleSheet(
+                f"QProgressBar {{ border: none; background-color: {COLORS['border']}; border-radius: 3px; }}"
+                f"QProgressBar::chunk {{ border-radius: 3px; background-color: {self.accent_color}; }}"
+            )
             self.set_progress(progress)
             layout.addWidget(self.progress_bar)
         else:
@@ -118,13 +188,23 @@ class MetricCard(QFrame):
 
     def set_progress(self, percent):
         if self.progress_bar:
-            self.progress_bar.setValue(min(100, int(percent)))
-            if percent > 90:
-                self.progress_bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {COLORS['critical']}; }}")
-            elif percent > 75:
-                self.progress_bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {COLORS['warning']}; }}")
+            clamped = min(100, int(percent))
+            self.progress_bar.setValue(clamped)
+            if clamped > 90:
+                self.progress_bar.setStyleSheet(
+                    f"QProgressBar {{ border: none; background-color: {COLORS['border']}; border-radius: 3px; }}"
+                    f"QProgressBar::chunk {{ border-radius: 3px; background-color: {COLORS['critical']}; }}"
+                )
+            elif clamped > 75:
+                self.progress_bar.setStyleSheet(
+                    f"QProgressBar {{ border: none; background-color: {COLORS['border']}; border-radius: 3px; }}"
+                    f"QProgressBar::chunk {{ border-radius: 3px; background-color: {COLORS['warning']}; }}"
+                )
             else:
-                self.progress_bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {COLORS['accent_secondary']}; }}")
+                self.progress_bar.setStyleSheet(
+                    f"QProgressBar {{ border: none; background-color: {COLORS['border']}; border-radius: 3px; }}"
+                    f"QProgressBar::chunk {{ border-radius: 3px; background-color: {self.accent_color}; }}"
+                )
 
 
 class DataCollectorWorker(QThread):
@@ -165,13 +245,13 @@ class SystemTab(QWidget):
         self.metrics_layout = QHBoxLayout()
         self.layout.addLayout(self.metrics_layout)
         
-        self.cpu_card = MetricCard("CPU", "—%", progress=0)
-        self.ram_card = MetricCard("RAM", "— / — GB", progress=0)
-        self.gpu_card = MetricCard("GPU", "—")
-        self.gpu_temp_card = MetricCard("GPU Temp", "—")
-        self.gpu_vram_card = MetricCard("VRAM", "—")
-        self.gpu_util_card = MetricCard("GPU Load", "—")
-        self.uptime_card = MetricCard("Uptime", "—")
+        self.cpu_card = MetricCard("المعالج", "—%", progress=0, accent_color=COLORS["accent"])
+        self.ram_card = MetricCard("الذاكرة", "— / — GB", progress=0, accent_color=COLORS["accent_secondary"])
+        self.gpu_card = MetricCard("كرت الشاشة", "—", accent_color=COLORS["accent_quaternary"])
+        self.gpu_temp_card = MetricCard("حرارة كرت الشاشة", "—", accent_color=COLORS["warning"])
+        self.gpu_vram_card = MetricCard("VRAM", "—", accent_color=COLORS["info"])
+        self.gpu_util_card = MetricCard("حمل كرت الشاشة", "—", accent_color=COLORS["accent_secondary"])
+        self.uptime_card = MetricCard("وقت التشغيل", "—", accent_color=COLORS["info"])
         
         for card in [self.cpu_card, self.ram_card, self.gpu_card, self.gpu_util_card,
                      self.gpu_vram_card, self.gpu_temp_card, self.uptime_card]:
@@ -261,10 +341,10 @@ class NetworkTab(QWidget):
         self.metrics_layout = QHBoxLayout()
         self.layout.addLayout(self.metrics_layout)
         
-        self.latency_card = MetricCard("Latency", "— ms")
-        self.loss_card = MetricCard("Packet Loss", "—%")
-        self.gateway_card = MetricCard("Gateway", "—")
-        self.public_ip_card = MetricCard("Public IP", "—")
+        self.latency_card = MetricCard("التأخير", "— ms", accent_color=COLORS["accent_secondary"])
+        self.loss_card = MetricCard("فقدان الحزم", "—%", accent_color=COLORS["warning"])
+        self.gateway_card = MetricCard("البوابة", "—", accent_color=COLORS["info"])
+        self.public_ip_card = MetricCard("IP العام", "—", accent_color=COLORS["accent_tertiary"])
         
         for card in [self.latency_card, self.loss_card, self.gateway_card, self.public_ip_card]:
             self.metrics_layout.addWidget(card)
@@ -416,11 +496,13 @@ class StorageTab(QWidget):
         
         partitions = data.get("partitions", [])
         for part in partitions:
+            accent = COLORS['accent_secondary'] if part.get('usage_percent', 0) < 70 else COLORS['warning']
             card = MetricCard(
-                f"Disk {part.get('mountpoint', '')}",
+                f"قرص {part.get('mountpoint', '')}",
                 f"{part.get('used_gb', 0):.1f} / {part.get('total_gb', 0):.1f} GB",
                 f"{part.get('free_gb', 0):.1f} GB free",
-                progress=part.get('usage_percent', 0)
+                progress=part.get('usage_percent', 0),
+                accent_color=accent
             )
             self.disks_layout.addWidget(card)
         self.disks_layout.addStretch()
@@ -508,10 +590,10 @@ class DiagnosticsTab(QWidget):
         summary_widget = QWidget()
         summary_layout = QHBoxLayout(summary_widget)
         summary_layout.setSpacing(15)
-        self.critical_card = MetricCard("Critical", "0")
-        self.error_card = MetricCard("Errors", "0")
-        self.warning_card = MetricCard("Warnings", "0")
-        self.info_card = MetricCard("Info", "0")
+        self.critical_card = MetricCard("حرج", "0", accent_color=COLORS["critical"])
+        self.error_card = MetricCard("أخطاء", "0", accent_color=COLORS["warning"])
+        self.warning_card = MetricCard("تحذيرات", "0", accent_color=COLORS["warning"])
+        self.info_card = MetricCard("معلومات", "0", accent_color=COLORS["info"])
         for card in [self.critical_card, self.error_card, self.warning_card, self.info_card]:
             summary_layout.addWidget(card)
         self.layout.addWidget(summary_widget)
@@ -653,7 +735,7 @@ class DiagnosticsTab(QWidget):
         
         for card, color in [(self.critical_card, COLORS['critical']), (self.error_card, COLORS['warning']),
                            (self.warning_card, COLORS['warning']), (self.info_card, COLORS['info'])]:
-            card.value_label.setStyleSheet(f"color: {color}; font-size: 28pt; font-weight: bold;")
+            card.value_label.setStyleSheet(f"color: {color}; font-size: 26pt; font-weight: bold;")
         
         self.refresh_btn.setEnabled(True)
         self.refresh_btn.setText("🔄 Refresh Logs")
@@ -706,17 +788,17 @@ class TrendsTab(QWidget):
         controls_layout = QHBoxLayout()
         controls_layout.addWidget(QLabel("Period:"))
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["Last 1 Hour", "Last 6 Hours", "Last 24 Hours", "Last 7 Days"])
+        self.period_combo.addItems(["آخر ساعة", "آخر 6 ساعات", "آخر 24 ساعة", "آخر 7 أيام"])
         self.period_combo.setCurrentIndex(2)
         controls_layout.addWidget(self.period_combo)
         
         controls_layout.addWidget(QLabel("Metric:"))
         self.metric_combo = QComboBox()
-        self.metric_combo.addItems(["CPU + RAM", "CPU Only", "RAM Only"])
+        self.metric_combo.addItems(["المعالج + الذاكرة", "المعالج فقط", "الذاكرة فقط"])
         controls_layout.addWidget(self.metric_combo)
         
         controls_layout.addStretch()
-        self.refresh_btn = QPushButton("🔄 Load Data")
+        self.refresh_btn = QPushButton("🔄 تحميل البيانات")
         self.refresh_btn.clicked.connect(self._load_data)
         controls_layout.addWidget(self.refresh_btn)
         
@@ -725,7 +807,9 @@ class TrendsTab(QWidget):
         # Chart
         self.chart = QChart()
         self.chart.setTitle("System Usage Trends")
-        self.chart.setAnimationOptions(QChart.NoAnimation)
+        self.chart.setAnimationOptions(QChart.SeriesAnimations)
+        self.chart.setTheme(QChart.ChartThemeDark)
+        self.chart.setBackgroundBrush(QColor(COLORS["card"]))
         self.chart.legend().setVisible(True)
         self.chart.legend().setAlignment(Qt.AlignBottom)
 
@@ -771,7 +855,7 @@ class TrendsTab(QWidget):
         self.layout.addWidget(chart_view, stretch=1)
 
         # Summary
-        self.summary_label = QLabel("Loading...")
+        self.summary_label = QLabel("جاري تحميل البيانات...")
         self.summary_label.setStyleSheet(f"color: {COLORS['text_muted']}; padding: 10px; font-size: 11pt;")
         self.summary_label.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.summary_label)
@@ -910,6 +994,9 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
+        
+        # Apply premium stylesheet
+        self.setStyleSheet(get_stylesheet())
         
         # Toolbar
         toolbar = QToolBar()
@@ -1166,6 +1253,17 @@ class MainWindow(QMainWindow):
     def _setup_menu_bar(self):
         """Setup menu bar with Help > About."""
         menu_bar = self.menuBar()
+        menu_bar.setStyleSheet(f"""
+            QMenuBar {{ background-color: {COLORS['card']}; color: {COLORS['text']};
+                        border-bottom: 1px solid {COLORS['border']}; padding: 2px 10px; }}
+            QMenuBar::item {{ color: {COLORS['text_muted']}; padding: 6px 16px; border-radius: 4px; }}
+            QMenuBar::item:selected {{ color: {COLORS['accent']}; background-color: {COLORS['card_hover']}; }}
+            QMenu {{ background-color: {COLORS['card']}; color: {COLORS['text']};
+                     border: 1px solid {COLORS['border']}; border-radius: 6px; padding: 4px 0; }}
+            QMenu::item {{ padding: 8px 24px; margin: 2px 4px; border-radius: 4px; font-size: 10pt; }}
+            QMenu::item:selected {{ background-color: {COLORS['accent']}; color: white; }}
+            QMenu::separator {{ height: 1px; background-color: {COLORS['border']}; margin: 4px 10px; }}
+        """)
         help_menu = menu_bar.addMenu("Help")
         help_menu.addAction("ℹ️ About", self._show_about)
         help_menu.addAction("📋 System Requirements", self._show_requirements)
@@ -1177,7 +1275,7 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QMessageBox
         QMessageBox.about(
             self, "About SystemScope",
-            "<h3>🔍 SystemScope v1.0</h3>"
+            "<h3 style='color:#E63946;'>🔍 SystemScope v1.0</h3>"
             "<p><b>Local System Intelligence Dashboard</b></p>"
             "<p>Professional Windows system monitoring,<br>"
             "diagnostics, and reporting.</p>"
@@ -1213,7 +1311,14 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    """Application entry point — loads fonts and launches dashboard."""
     app = QApplication(sys.argv)
+    
+    # Load Cairo fonts
+    loaded = load_fonts()
+    if loaded:
+        font = QFont("Cairo", 10)
+        app.setFont(font)
     
     # Set AppUserModelID BEFORE window creation
     try:
@@ -1223,6 +1328,7 @@ def main():
         pass
     
     window = MainWindow()
+    window.setStyleSheet(get_stylesheet())
     window.show()
     
     # Force taskbar icon update using Win32 API directly
@@ -1233,21 +1339,15 @@ def main():
             
             hwnd = int(window.winId())
             
-            # Load icon from resources
             hicon = ctypes.windll.user32.LoadImageW(
-                None,  # hInstance = NULL (use application instance)
-                1,     # Icon ID (1 is the default icon from --icon)
-                1,     # IMAGE_ICON
-                0, 0,  # cxDesired, cyDesired = 0 (use default)
-                0x00000010 | 0x00000002  # LR_DEFAULTSIZE | LR_SHARED
+                None, 1, 1, 0, 0, 0x00000010 | 0x00000002
             )
             
             if hicon:
-                # WM_SETICON = 0x0080
-                ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon)  # ICON_SMALL
-                ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon)  # ICON_BIG
-                ctypes.windll.user32.SetClassLongPtrW(hwnd, -14, hicon)    # GCL_HICON
-                ctypes.windll.user32.SetClassLongPtrW(hwnd, -16, hicon)   # GCL_HICONSM
+                ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hicon)
+                ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hicon)
+                ctypes.windll.user32.SetClassLongPtrW(hwnd, -14, hicon)
+                ctypes.windll.user32.SetClassLongPtrW(hwnd, -16, hicon)
                 ctypes.windll.user32.DrawMenuBar(hwnd)
         except Exception:
             pass
