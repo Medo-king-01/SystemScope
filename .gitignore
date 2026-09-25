@@ -1,0 +1,13 @@
+* SystemScope
+*.db
+*.sqlite
+*.pyc
+*.pyo
+__pycache__/
+build/
+dist/
+*.spec
+.env
+.idea/
+.vscode/
+*.user
