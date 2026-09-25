@@ -1,3 +1,0 @@
-# SystemScope
-
-SystemScope core package.
