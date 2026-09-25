@@ -600,6 +600,7 @@ class DiagnosticsTab(QWidget):
         
         # Filter section
         filter_group = QGroupBox("Windows Event Log Filters")
+        filter_group.setStyleSheet(f"QGroupBox {{ margin-top: 10px; }}" if False else "")
         filter_main_layout = QVBoxLayout(filter_group)
         
         # Row 1
@@ -654,9 +655,16 @@ class DiagnosticsTab(QWidget):
         self.events_table = QTableWidget()
         self.events_table.setColumnCount(6)
         self.events_table.setHorizontalHeaderLabels(["Time", "Level", "Event ID", "Log", "Provider", "Message"])
-        self.events_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         self.events_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.events_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.events_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.events_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.events_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.events_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         self.events_table.setAlternatingRowColors(True)
+        self.events_table.setMinimumHeight(200)
+        self.events_table.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
+        self.events_table.verticalHeader().setVisible(False)
         self.layout.addWidget(self.events_table, stretch=1)
         
         # Diagnostics
@@ -668,8 +676,11 @@ class DiagnosticsTab(QWidget):
         self.diagnostics_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.diagnostics_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.diagnostics_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
-        diag_layout.addWidget(self.diagnostics_table)
-        self.layout.addWidget(diag_group)
+        diag_layout.addWidget(self.diagnostics_table, stretch=1)
+        self.diagnostics_table.setMinimumHeight(150)
+        self.diagnostics_table.setAlternatingRowColors(True)
+        self.diagnostics_table.verticalHeader().setVisible(False)
+        self.layout.addWidget(diag_group, stretch=1)
         
         self.current_events = []
     
